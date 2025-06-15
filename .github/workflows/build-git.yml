@@ -86,11 +86,24 @@ jobs:
       - name: Upload to server via SCP
         if: success()
         run: |
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no \
-            git-${{ env.GIT_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip \
-            ${{ secrets.VALINOR_WORKER_SSH_USERNAME }}@${{ secrets.VALINOR_SERVER_ADDRESS }}:/var/www/resources.agena.ai/tools/git/
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      
+          echo "Host ${VALINOR_SERVER_ADDRESS}
+            HostName ${VALINOR_SERVER_ADDRESS}
+            User ${VALINOR_USER}
+            IdentityFile ~/.ssh/id_rsa
+            IdentitiesOnly yes
+            PubkeyAcceptedAlgorithms +ssh-rsa
+            HostkeyAlgorithms +ssh-rsa
+            StrictHostKeyChecking no" >> ~/.ssh/config
+      
+          scp git-${GIT_VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip ${VALINOR_USER}@${VALINOR_SERVER_ADDRESS}:/var/www/resources.agena.ai/tools/git/
         env:
           SSH_PRIVATE_KEY: ${{ secrets.VALINOR_WORKER_SSH_KEY }}
+          VALINOR_USER: ${{ secrets.VALINOR_WORKER_SSH_USERNAME }}
+          VALINOR_SERVER_ADDRESS: ${{ secrets.VALINOR_SERVER_ADDRESS }}
         shell: bash
 
       - name: Cleanup SSH key
