@@ -12,14 +12,14 @@ jobs:
     strategy:
       matrix:
         include:
-          # - os: ubuntu-latest
-          #   arch: x64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-          # - os: macos-14
-          #   arch: x64
-          # - os: macos-14-arm64
+          - os: ubuntu-latest
+            arch: x64
+          # - os: ubuntu-24.04-arm
           #   arch: arm64
+          - os: macos-14
+            arch: x64
+          - os: macos-14-arm64
+            arch: arm64
 
     name: Build Git on ${{ matrix.os }} (${{ matrix.arch }})
 
@@ -43,7 +43,7 @@ jobs:
       - name: Install build dependencies (macOS)
         if: startsWith(matrix.os, 'macos-')
         run: |
-          brew install autoconf gettext curl openssl
+          brew install autoconf gettext curl openssl perl
           brew link --overwrite --force gettext || true
 
       - name: Download and extract Git source
@@ -65,22 +65,15 @@ jobs:
           ./configure --prefix=$PWD/install || { cat config.log; exit 1; }
           make -j$(getconf _NPROCESSORS_ONLN)
           make install
-          find install -type f -exec file {} \; | grep ELF | cut -d: -f1 | xargs --no-run-if-empty strip --strip-unneeded || true
+          if [[ "$(uname)" == "Linux" ]]; then
+            find install -type f -exec file {} \; | grep ELF | cut -d: -f1 | xargs --no-run-if-empty strip --strip-unneeded || true
+          fi
         shell: bash
 
       - name: Archive Git output
         run: |
           cd $GIT_DIR/install
           zip -r ../../git-${{ env.GIT_VERSION }}-${{ matrix.os }}-${{ matrix.arch }}.zip .
-        shell: bash
-
-      - name: Set up SSH key for SCP
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.VALINOR_WORKER_SSH_KEY }}
         shell: bash
 
       - name: Upload to server via SCP
@@ -99,7 +92,7 @@ jobs:
             HostkeyAlgorithms +ssh-rsa
             StrictHostKeyChecking no" >> ~/.ssh/config
       
-          scp git-${GIT_VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip ${VALINOR_USER}@${VALINOR_SERVER_ADDRESS}:/var/www/resources.agena.ai/tools/git/
+          scp "git-${GIT_VERSION}-${{ matrix.os }}-${{ matrix.arch }}.zip" "${VALINOR_USER}@${VALINOR_SERVER_ADDRESS}:/var/www/resources.agena.ai/tools/git/"
         env:
           SSH_PRIVATE_KEY: ${{ secrets.VALINOR_WORKER_SSH_KEY }}
           VALINOR_USER: ${{ secrets.VALINOR_WORKER_SSH_USERNAME }}
